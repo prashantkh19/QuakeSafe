@@ -23,6 +23,7 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
@@ -74,6 +75,8 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
         mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+//        mMap.setPadding(2,0,0,0);
+        mMap.getUiSettings().setCompassEnabled(false);
 
 //        Polygon polygon = mMap.addPolygon(new PolygonOptions()
 //                .add(new LatLng(28.36267, 75.58565), new LatLng(28.36276, 75.58629), new LatLng(28.36185, 75.58644), new LatLng(28.36176, 75.58576))
