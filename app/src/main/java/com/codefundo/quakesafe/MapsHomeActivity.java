@@ -1,7 +1,6 @@
 package com.codefundo.quakesafe;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -9,8 +8,6 @@ import android.location.Location;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
@@ -21,12 +18,10 @@ import android.util.Log;
 import android.util.Pair;
 import android.view.View;
 import android.widget.ImageView;
-import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
@@ -37,7 +32,6 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
@@ -46,15 +40,8 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polygon;
 import com.google.android.gms.maps.model.PolygonOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.maps.android.PolyUtil;
-import com.pubnub.api.PNConfiguration;
-import com.pubnub.api.PubNub;
-import com.pubnub.api.callbacks.PNCallback;
-import com.pubnub.api.callbacks.SubscribeCallback;
-import com.pubnub.api.models.consumer.PNPublishResult;
-import com.pubnub.api.models.consumer.PNStatus;
-import com.pubnub.api.models.consumer.pubsub.PNMessageResult;
-import com.pubnub.api.models.consumer.pubsub.PNPresenceEventResult;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -62,20 +49,16 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.HashMap;
+import java.util.List;
 
 public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
@@ -136,8 +119,6 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
             public void onClick(View v) {
                 if (mCurrLocationMarker != null) {
                     getData(mCurrLocationMarker.getPosition());
-                    bt.setVisibility(View.GONE);
-                    cv_text.setVisibility(View.VISIBLE);
                 } else {
                     Toast.makeText(MapsHomeActivity.this, "Try again!", Toast.LENGTH_SHORT).show();
                 }
@@ -193,6 +174,7 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
                 markerOptions.title("Current Position");
                 markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
                 mCurrLocationMarker = mMap.addMarker(markerOptions);
+                mCurrLocationMarker.showInfoWindow();
                 //move map camera
                 mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
 //                mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
@@ -205,7 +187,7 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
                 //updating safe parameter
                 double min_distance = 10000;
                 boolean flag = true;
-                int k = Math.min(latlngArray.size(), 20);
+                int k = Math.min(latlngArray.size(), 50);
                 for (int i = 0; i < k; i++) {
                     ArrayList<LatLng> boundary = new ArrayList<>();
                     boundary.add(latlngArray.get(i).latLngA);
@@ -218,18 +200,20 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
                         flag = false;
                     }
                 }
+
                 if (flag) {
                     //safe
-                    tv_is_safe.setText("SAFE!");
+                    tv_is_safe.setText("SAFE");
                     tv_is_safe.setTextColor(ContextCompat.getColor(MapsHomeActivity.this, R.color.safe));
                     tv_index.setVisibility(View.VISIBLE);
-                    tv_index.setText(min_distance + "");
+                    tv_index.setText("Safety Index : " + String.format("%.2f", min_distance));
                 } else {
                     //unsafe
-                    tv_is_safe.setText("UNSAFE!");
+                    tv_is_safe.setText("UNSAFE");
                     tv_is_safe.setTextColor(ContextCompat.getColor(MapsHomeActivity.this, R.color.unsafe));
                     tv_index.setVisibility(View.GONE);
                 }
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 17f));
             }
         });
     }
@@ -269,17 +253,8 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
 
         Log.d("llllllllllllllllllllll", "changed " + location.getLatitude() + " " + location.getLongitude());
         mLastLocation = location;
-
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(location.getLatitude(), location.getLongitude()), 14f));
 
-
-        Circle circle = mMap.addCircle(new CircleOptions()
-                .center(new LatLng(location.getLatitude(), location.getLongitude()))
-                .radius(500)
-                .strokeColor(Color.GREEN)
-                .strokeWidth(10)
-        );
-        circle.setFillColor(Color.argb(50, 0, 255, 0));
 
         if (mCurrLocationMarker != null) {
             mCurrLocationMarker.remove();
@@ -294,7 +269,7 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
         mCurrLocationMarker = mMap.addMarker(markerOptions);
         //move map camera
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-        mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
+//        mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
 
         //stop location updates
         if (mGoogleApiClient != null) {
@@ -302,33 +277,33 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
         }
 
         //updating safe parameter
-        double min_distance = 10000;
-        boolean flag = true;
-        int k = Math.min(latlngArray.size(), 20);
-        for (int i = 0; i < k; i++) {
-            ArrayList<LatLng> boundary = new ArrayList<>();
-            boundary.add(latlngArray.get(i).latLngA);
-            boundary.add(latlngArray.get(i).latLngB);
-            boundary.add(latlngArray.get(i).latLngC);
-            boundary.add(latlngArray.get(i).latLngD);
-            min_distance = Math.min(min_distance, distance(latLng.latitude, latLng.longitude, latlngArray.get(i).getCenterLatLng().latitude, latlngArray.get(i).getCenterLatLng().longitude));
-            if (PolyUtil.containsLocation(latLng, boundary, false)) {
-                //safe
-                flag = false;
-            }
-        }
-        if (flag) {
-            //safe
-            tv_is_safe.setText("SAFE!");
-            tv_is_safe.setTextColor(ContextCompat.getColor(this, R.color.safe));
-            tv_index.setVisibility(View.VISIBLE);
-            tv_index.setText(min_distance + "");
-        } else {
-            //unsafe
-            tv_is_safe.setText("UNSAFE!");
-            tv_is_safe.setTextColor(ContextCompat.getColor(this, R.color.unsafe));
-            tv_index.setVisibility(View.GONE);
-        }
+//        double min_distance = 10000;
+//        boolean flag = true;
+//        int k = Math.min(latlngArray.size(), 20);
+//        for (int i = 0; i < k; i++) {
+//            ArrayList<LatLng> boundary = new ArrayList<>();
+//            boundary.add(latlngArray.get(i).latLngA);
+//            boundary.add(latlngArray.get(i).latLngB);
+//            boundary.add(latlngArray.get(i).latLngC);
+//            boundary.add(latlngArray.get(i).latLngD);
+//            min_distance = Math.min(min_distance, distance(latLng.latitude, latLng.longitude, latlngArray.get(i).getCenterLatLng().latitude, latlngArray.get(i).getCenterLatLng().longitude));
+//            if (PolyUtil.containsLocation(latLng, boundary, false)) {
+//                //safe
+//                flag = false;
+//            }
+//        }
+//        if (flag) {
+//            //safe
+//            tv_is_safe.setText("SAFE!");
+//            tv_is_safe.setTextColor(ContextCompat.getColor(this, R.color.safe));
+//            tv_index.setVisibility(View.VISIBLE);
+//            tv_index.setText(min_distance + "");
+//        } else {
+//            //unsafe
+//            tv_is_safe.setText("UNSAFE!");
+//            tv_is_safe.setTextColor(ContextCompat.getColor(this, R.color.unsafe));
+//            tv_index.setVisibility(View.GONE);
+//        }
 
     }
 
@@ -425,9 +400,10 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
         }
     }
 
+    ProgressDialog progressDialog;
     private void getData(final LatLng latLng) {
-        final ProgressDialog progressDialog = new ProgressDialog(this);
-        progressDialog.setMessage("getting data!");
+        progressDialog = new ProgressDialog(this);
+        progressDialog.setMessage("Calculating Safe Locations..");
         progressDialog.setCancelable(false);
         class GetData extends AsyncTask<Void, Void, String> {
             @Override
@@ -437,7 +413,6 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
 
             @Override
             protected void onPostExecute(String s) {
-                progressDialog.dismiss();
                 super.onPostExecute(s);
                 parseJSON(s);
             }
@@ -448,7 +423,7 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
                     URL url = new URL("https://earthquakerapp.azurewebsites.net/get_safe_location/");
                     String urlParams = "latitude=" + latLng.latitude +
                             "&longitude=" + latLng.longitude +
-                            "&distance=" + "0.1";
+                            "&distance=" + "0.3";
 
                     HttpURLConnection con = (HttpURLConnection) url.openConnection();
                     con.setDoOutput(true);
@@ -488,9 +463,9 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
         try {
             JSONObject root = new JSONObject(json);
             error = root.getBoolean("error");
-            if (error) {
+            if (!error) {
                 JSONArray jsonArray = root.getJSONArray("response");
-                Toast.makeText(MapsHomeActivity.this, jsonArray.length() + "abcd", Toast.LENGTH_SHORT).show();
+//                Toast.makeText(MapsHomeActivity.this, jsonArray.length() + "abcd", Toast.LENGTH_SHORT).show();
                 if (jsonArray.length() > 0)
                     latlngArray.clear();
 
@@ -507,7 +482,7 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
                     );
                     latlngArray.add(itemLocation);
                 }
-                Toast.makeText(MapsHomeActivity.this, latlngArray.size() + "abcd", Toast.LENGTH_SHORT).show();
+//                Toast.makeText(MapsHomeActivity.this, latlngArray.size() + "abcd", Toast.LENGTH_SHORT).show();
                 showOnMap();
             } else {
                 Toast.makeText(MapsHomeActivity.this, "Connection error!", Toast.LENGTH_SHORT).show();
@@ -569,7 +544,8 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
 
     //showing building polygon on maps using the server response
     private void showOnMap() {
-
+        bt.setVisibility(View.GONE);
+        cv_text.setVisibility(View.VISIBLE);
         Collections.sort(latlngArray, new Comparator<ItemLocation>() {
             @Override
             public int compare(ItemLocation o1, ItemLocation o2) {
@@ -614,16 +590,24 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
 
             Polygon polygon1 = mMap.addPolygon(new PolygonOptions()
                             .add(l1_, l2_, l3_, l4_)
-//                    .strokeColor(0x7FFF0000)
+                    .strokeColor(0x9fd32f2f)
             );
-            polygon1.setFillColor(0x7F0000FF);
+            polygon1.setFillColor(0x9fd32f2f);
 
             Polygon polygon2 = mMap.addPolygon(new PolygonOptions()
                             .add(l1, l2, l3, l4)
-//                    .strokeColor(0x7FFF0000)
+                    .strokeColor(0x9f9a0007)
             );
-            polygon2.setFillColor(0x7FFF0000);
+            polygon2.setFillColor(0x9f9a0007);
         }
+
+        Circle circle = mMap.addCircle(new CircleOptions()
+                .center(mCurrLocationMarker.getPosition())
+                .radius(500)
+                .strokeColor(Color.GREEN)
+                .strokeWidth(10)
+        );
+        circle.setFillColor(Color.argb(80, 0, 255, 0));
 
         //updating safe parameter
         double min_distance = 10000;
@@ -643,17 +627,227 @@ public class MapsHomeActivity extends FragmentActivity implements OnMapReadyCall
         }
         if (flag) {
             //safe
-            tv_is_safe.setText("SAFE!");
+            tv_is_safe.setText("SAFE");
             tv_is_safe.setTextColor(ContextCompat.getColor(this, R.color.safe));
             tv_index.setVisibility(View.VISIBLE);
-            tv_index.setText(min_distance + "");
+            tv_index.setText("Safety Index : " + String.format("%.2f", min_distance));
         } else {
             //unsafe
-            tv_is_safe.setText("UNSAFE!");
+            tv_is_safe.setText("UNSAFE");
             tv_is_safe.setTextColor(ContextCompat.getColor(this, R.color.unsafe));
             tv_index.setVisibility(View.GONE);
         }
+        progressDialog.dismiss();
+        LatLng location = findDestination(mCurrLocationMarker.getPosition());
+        mMap.addMarker(new MarkerOptions().position(location).title("Safest spot near you")).showInfoWindow();
+        mCurrLocationMarker.hideInfoWindow();
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, 17f));
+        //show navigation here
+        startNavigation(mCurrLocationMarker.getPosition(), new LatLng(location.latitude, location.longitude));
+    }
 
+
+    public LatLng findDestination(LatLng current) {
+        double x, y, r;
+        LatLng destination = current, check;
+        double max_dist = 0, dist;
+        for (int i = 1; i <= 100; i++) {
+            r = (double) i / 111139;
+            int N = (int) Math.min(2 * Math.PI * i, 100);
+            Log.d("ppppppppppp", "N " + N);
+            for (int n = 1; n <= N; n++) {
+                check = new LatLng(current.latitude + r * Math.sin(2 * Math.PI * n / (double) N), current.longitude + r * Math.cos(2 * Math.PI * n / (double) N));
+
+                dist = getMaxIndex(check);
+                if (dist > max_dist) {
+                    max_dist = dist;
+                    destination = check;
+                }
+            }
+        }
+        return destination;
+    }
+
+    private double getMaxIndex(LatLng location) {
+        double min_distance = 151511515;
+        int k = Math.min(latlngArray.size(), 50);
+        boolean is = true;
+        for (int i = 0; i < k; i++) {
+            ArrayList<LatLng> boundary = new ArrayList<>();
+            boundary.add(latlngArray.get(i).latLngA);
+            boundary.add(latlngArray.get(i).latLngB);
+            boundary.add(latlngArray.get(i).latLngC);
+            boundary.add(latlngArray.get(i).latLngD);
+            min_distance = Math.min(min_distance, distance(location.latitude, location.longitude, latlngArray.get(i).getCenterLatLng().latitude, latlngArray.get(i).getCenterLatLng().longitude));
+            if (PolyUtil.containsLocation(location, boundary, false)) {
+                //safe
+                is = false;
+            }
+        }
+        if (is)
+            return min_distance;
+        else
+            return -1;
+    }
+
+    private void startNavigation(LatLng start, LatLng end) {
+
+        // Getting URL to the Google Directions API
+        String url = getDirectionsUrl(start, end);
+
+        DownloadTask downloadTask = new DownloadTask();
+
+        // Start downloading json data from Google Directions API
+        downloadTask.execute(url);
+
+    }
+
+    private class DownloadTask extends AsyncTask<String, Void, String> {
+
+        @Override
+        protected String doInBackground(String... url) {
+
+            String data = "";
+
+            try {
+                data = downloadUrl(url[0]);
+            } catch (Exception e) {
+                Log.d("Background Task", e.toString());
+            }
+            return data;
+        }
+
+        @Override
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+
+            ParserTask parserTask = new ParserTask();
+
+
+            parserTask.execute(result);
+
+        }
+    }
+
+    private class ParserTask extends AsyncTask<String, Integer, List<List<HashMap<String, String>>>> {
+
+        // Parsing the data in non-ui thread
+        @Override
+        protected List<List<HashMap<String, String>>> doInBackground(String... jsonData) {
+
+            Log.d("tttttttt", jsonData[0]);
+            JSONObject jObject;
+            List<List<HashMap<String, String>>> routes = new ArrayList<>();
+
+            try {
+                jObject = new JSONObject(jsonData[0]);
+                Toast.makeText(MapsHomeActivity.this, jObject.getString("error_message"), Toast.LENGTH_SHORT).show();
+                DirectionsJSONParser parser = new DirectionsJSONParser();
+
+                routes = parser.parse(jObject);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            Log.d("tttttttt", routes.toString());
+            return routes;
+        }
+
+        @Override
+        protected void onPostExecute(List<List<HashMap<String, String>>> result) {
+
+            ArrayList points = null;
+            PolylineOptions lineOptions = null;
+            MarkerOptions markerOptions = new MarkerOptions();
+            Log.d("tttttttt", result.toString());
+            for (int i = 0; i < result.size(); i++) {
+                points = new ArrayList();
+                lineOptions = new PolylineOptions();
+
+                List<HashMap<String, String>> path = result.get(i);
+
+                for (int j = 0; j < path.size(); j++) {
+                    HashMap point = path.get(j);
+
+                    double lat = Double.parseDouble((String) point.get("lat"));
+                    double lng = Double.parseDouble((String) point.get("lng"));
+                    LatLng position = new LatLng(lat, lng);
+
+                    points.add(position);
+                }
+
+                lineOptions.addAll(points);
+                lineOptions.width(12);
+                lineOptions.color(Color.RED);
+                lineOptions.geodesic(true);
+
+            }
+
+// Drawing polyline in the Google Map for the i-th route
+            if (lineOptions != null)
+                mMap.addPolyline(lineOptions);
+//            else
+//                Toast.makeText(MapsHomeActivity.this,"not available!",Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private String getDirectionsUrl(LatLng origin, LatLng dest) {
+
+        // Origin of route
+        String str_origin = "origin=" + origin.latitude + "," + origin.longitude;
+
+        // Destination of route
+        String str_dest = "destination=" + dest.latitude + "," + dest.longitude;
+
+        // Sensor enabled
+        String sensor = "sensor=false";
+        String mode = "mode=walking";
+
+        // Building the parameters to the web service
+        String parameters = str_origin + "&" + str_dest + "&" + sensor + "&" + mode + "&key=AIzaSyDigv2JcnMYg1Y1W9kFA5_gYJTUpuyMgnY";
+
+        // Output format
+        String output = "json";
+
+        // Building the url to the web service
+        String url = "https://maps.googleapis.com/maps/api/directions/" + output + "?" + parameters;
+
+
+        return url;
+    }
+
+    private String downloadUrl(String strUrl) throws IOException {
+        String data = "";
+        InputStream iStream = null;
+        HttpURLConnection urlConnection = null;
+        try {
+            URL url = new URL(strUrl);
+
+            urlConnection = (HttpURLConnection) url.openConnection();
+
+            urlConnection.connect();
+
+            iStream = urlConnection.getInputStream();
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(iStream));
+
+            StringBuffer sb = new StringBuffer();
+
+            String line = "";
+            while ((line = br.readLine()) != null) {
+                sb.append(line);
+            }
+
+            data = sb.toString();
+
+            br.close();
+
+        } catch (Exception e) {
+            Log.d("Exception", e.toString());
+        } finally {
+            iStream.close();
+            urlConnection.disconnect();
+        }
+        return data;
     }
 
 }
