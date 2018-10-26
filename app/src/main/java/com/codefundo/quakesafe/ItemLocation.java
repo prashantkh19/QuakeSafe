@@ -38,6 +38,23 @@ public class ItemLocation {
     public LatLng getLatLngD() {
         return latLngD;
     }
+
+    public void setLatLngA(LatLng latLngA) {
+        this.latLngA = latLngA;
+    }
+
+    public void setLatLngB(LatLng latLngB) {
+        this.latLngB = latLngB;
+    }
+
+    public void setLatLngC(LatLng latLngC) {
+        this.latLngC = latLngC;
+    }
+
+    public void setLatLngD(LatLng latLngD) {
+        this.latLngD = latLngD;
+    }
+
     public LatLng getCenterLatLng(){
         return new LatLng((latLngA.latitude+latLngB.latitude+latLngC.latitude+latLngD.latitude)/4,(latLngA.longitude+latLngB.longitude+latLngC.longitude+latLngD.longitude)/4);
     }

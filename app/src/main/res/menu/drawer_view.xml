@@ -3,9 +3,11 @@
     <group android:checkableBehavior="single">
         <item
             android:id="@+id/my_connections"
+            android:icon="@drawable/group_button"
             android:title="My Connections" />
         <item
             android:id="@+id/add_connection"
+            android:icon="@drawable/plus"
             android:title="Add a Connection" />
     </group>
 </menu>
